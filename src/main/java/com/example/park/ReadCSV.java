@@ -1,25 +1,21 @@
 package com.example.park;
 
 import com.opencsv.CSVReader;
-import com.opencsv.CSVWriter;
-import com.opencsv.bean.ColumnPositionMappingStrategy;
-import com.opencsv.bean.StatefulBeanToCsv;
-import com.opencsv.bean.StatefulBeanToCsvBuilder;
-import com.opencsv.exceptions.CsvDataTypeMismatchException;
-import com.opencsv.exceptions.CsvRequiredFieldEmptyException;
 
+import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.time.Month;
 import java.util.*;
 
 public class ReadCSV {
 
     public static HashMap<String, List<AuditLog>> readCSV() throws IOException, ParseException
     {
-        String fileName = "C:\\Users\\Admin\\Downloads\\park.csv";
+        String fileName = "C:\\Users\\Admin\\Downloads\\Auditlog_dataset.csv";
         HashMap<String, List<AuditLog>> hashMap = new HashMap<>();
         try( CSVReader csvReader = new CSVReader(new FileReader(fileName)); )
         {
@@ -53,34 +49,54 @@ public class ReadCSV {
         return hashMap;
     }
 
-    public static void writeCSV( List<Report> reportList )
-            throws IOException, CsvRequiredFieldEmptyException, CsvDataTypeMismatchException
+    public static void writeCSV( List<Report> reportList, List<Integer> months )
     {
+        try
+        {
+            String destinationFile = "C:\\Users\\Admin\\Downloads\\result.csv";
+            File file = new File(destinationFile);
+            FileWriter myWriter = new FileWriter(file, false);
 
-        String destinationFile = "C:\\Users\\Admin\\Downloads\\result.csv";
-        FileWriter writer = new FileWriter(destinationFile);
-        ColumnPositionMappingStrategy mappingStrategy = new ColumnPositionMappingStrategy();
-        mappingStrategy.setType(Report.class);
+            List<String> headerList = new ArrayList<>();
+            headerList.add("Resource Id");
+            for( Integer month : months )
+            {
+                String monthName = Month.of(month).name();
+                headerList.add(monthName + " Parked time in Min");
+                headerList.add(monthName + " Calculation Data");
+            }
+            headerList.add("Comments\n");
+            myWriter.write(String.join(",", headerList));
 
-        CSVWriter csvWrite = new CSVWriter(writer);
-        String[] header = new String[] { "Resource Id", "December Parked time in Mins", "January Parked time in Mins",
-                "December Calculations Data", "January Calculation Data", "Comments" };
-        csvWrite.writeNext(header);
+            for( Report report : reportList )
+            {
+                List<String> valueList = new ArrayList<>();
+                valueList.add(report.getResourceId());
 
-        String[] columns = new String[] { "resourceId", "december", "january", "decemberCalculation",
-                "januaryCalculation", "comments" };
-        mappingStrategy.setColumnMapping(columns);
+                for( Integer month : months )
+                {
+                    Report.MonthData monthData = report.getMonthData().get(month - 1);
+                    if( monthData == null )
+                    {
+                        valueList.add("0");
+                        valueList.add("NA");
+                    }
+                    else
+                    {
+                        valueList.add(String.valueOf(monthData.getDurationInMin()));
+                        valueList.add("\"" + monthData.getDurationCalculation() + "\"");
+                    }
+                }
 
-        // Creating StatefulBeanToCsv object
-        StatefulBeanToCsvBuilder<Report> builder = new StatefulBeanToCsvBuilder(writer);
-        StatefulBeanToCsv beanWriter = builder.withMappingStrategy(mappingStrategy).build();
+                valueList.add(report.getComments() + "\n");
+                myWriter.write(String.join(",", valueList));
+            }
 
-        // Write list to StatefulBeanToCsv object
-        beanWriter.write(reportList);
-
-        // closing the writer object
-        csvWrite.close();
-        writer.close();
-
+            myWriter.close();
+        }
+        catch( Exception e )
+        {
+            e.printStackTrace();
+        }
     }
 }

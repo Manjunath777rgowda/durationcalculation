@@ -1,30 +1,22 @@
 package com.example.park;
 
-import com.opencsv.exceptions.CsvDataTypeMismatchException;
-import com.opencsv.exceptions.CsvRequiredFieldEmptyException;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.io.IOException;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping( "/start" )
 public class Controller {
 
     @GetMapping
-    public void startTheProcess()
-            throws IOException, ParseException, CsvRequiredFieldEmptyException, CsvDataTypeMismatchException
+    public void generateParkDuration( @RequestParam String monthString ) throws Exception
     {
+        List<Integer> months = validateMonthString(monthString);
         HashMap<String, List<AuditLog>> hashmap = ReadCSV.readCSV();
-        SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd");
-        Date decStart = simpleDateFormat.parse("2022-12-01");
-        Date decEnd = new Date(simpleDateFormat.parse("2023-01-01").getTime() - 1);
-        Date janStart = simpleDateFormat.parse("2023-01-01");
-        Date janEnd = new Date(simpleDateFormat.parse("2023-02-01").getTime() - 1);
         List<Report> result = new ArrayList<>();
 
         for( Map.Entry<String, List<AuditLog>> entry : hashmap.entrySet() )
@@ -40,12 +32,9 @@ public class Controller {
             {
                 AuditLog auditLog = value.get(i);
 
-                if( auditLog.getEventName().equals("Park") && auditLog.getStatus().equals("Complete")
-                        && auditLog.getTriggerTime().before(janEnd) )
+                if( auditLog.getEventName().equals("Park") && auditLog.getStatus().equals("Complete") )
                 {
                     start = auditLog.getTriggerTime();
-                    if( start.before(decStart) )
-                        start = decStart;
 
                     if( isStarted )
                         report.setComments("");
@@ -78,101 +67,73 @@ public class Controller {
 
                 if( start != null && end != null )
                 {
-                    if( start.equals(decStart) || (start.after(decStart) && start.before(decEnd)) )
-                    {
-                        if( end.before(decEnd) )
-                        {
-                            report.setDecember(start.getTime(), end.getTime());
-                        }
-                        else if( end.after(janStart) && end.before(janEnd) )
-                        {
-                            report.setDecember(start.getTime(), decEnd.getTime());
-                            report.setJanuary(janStart.getTime(), end.getTime());
-                        }
-                        else if( end.after(janEnd) )
-                        {
-                            report.setDecember(start.getTime(), decEnd.getTime());
-                            report.setJanuary(janStart.getTime(), janEnd.getTime());
-                        }
-                        else
-                            System.out.println("Error");
-                    }
-                    else if( start.after(janStart) && start.before(janEnd) )
-                    {
-                        if( end.before(janEnd) )
-                        {
-                            report.setJanuary(start.getTime(), end.getTime());
-                        }
-                        else if( end.after(janEnd) )
-                        {
-                            report.setJanuary(start.getTime(), janEnd.getTime());
-                        }
-                        else
-                            System.out.println("Error");
-                    }
-                    else
-                        System.out.println("Error");
-
+                    calculateTheDuration(start, end, report);
                     start = null;
                     end = null;
                 }
 
                 if( start != null && i == valueSize - 1 )
-                {
-                    if( start.equals(decStart) || (start.after(decStart) && start.before(decEnd)) )
-                    {
-                        report.setDecember(start.getTime(), decEnd.getTime());
-                        report.setJanuary(janStart.getTime(), janEnd.getTime());
-                    }
-                    else if( start.after(janStart) && start.before(janEnd) )
-                    {
-                        report.setJanuary(start.getTime(), janEnd.getTime());
-                    }
-                    else
-                        System.out.println("Error");
-                }
-
+                    calculateTheDuration(start, new Date(), report);
             }
-
-            if( report.getDecember() != 0 || report.getJanuary() != 0 )
-                result.add(report);
-
+            result.add(report);
         }
 
-        for( Report report : result )
-        {
-
-            if( report.getDecember() != 0 )
-                report.setDecember(report.getDecember() / (1000 * 60));
-
-            if( report.getJanuary() != 0 )
-                report.setJanuary(report.getJanuary() / (1000 * 60));
-
-            System.out.println(report.getResourceId() + "|" + report.getDecember() + "|" + report.getJanuary() + "|"
-                    + report.getDecemberCalculation() + "|" + report.getJanuaryCalculation());
-
-            if( report.getDecember() > 44640 || report.getJanuary() > 44640 )
-            {
-                System.out.println("_______________________________________________________________");
-                System.out.println("More value : " + report.getResourceId());
-                System.out.println(report.getResourceId() + "|" + report.getDecember() + "|" + report.getJanuary() + "|"
-                        + report.getComments());
-                System.out.println("_______________________________________________________________");
-            }
-
-            if( report.getDecember() < 0 || report.getJanuary() < 0 )
-            {
-                System.out.println("_______________________________________________________________");
-                System.out.println("Negative value : " + report.getResourceId());
-                System.out.println(report.getResourceId() + "|" + report.getDecember() + "|" + report.getJanuary() + "|"
-                        + report.getComments());
-                System.out.println("_______________________________________________________________");
-
-            }
-        }
-
-        ReadCSV.writeCSV(result);
+        ReadCSV.writeCSV(result, months);
         System.out.println("Completed");
+    }
+
+    private List<Integer> validateMonthString( String monthString ) throws Exception
+    {
+        if( monthString == null || monthString.isEmpty() )
+            throw new Exception("MonthString can not be empty");
+
+        String[] split = monthString.split(",");
+        return Arrays.stream(split).map(Integer::parseInt).filter(month -> month >= 1 && month <= 12).sorted()
+                .collect(Collectors.toList());
+    }
+
+    private void calculateTheDuration( Date start, Date end, Report report )
+    {
+        HashMap<Integer, Report.MonthData> monthDataMap = report.getMonthData();
+        while( start.before(end) )
+        {
+            int month = getBeginningMonth(start).getMonth();
+            Report.MonthData monthData = monthDataMap.get(month);
+            if( monthData == null )
+                monthData = new Report.MonthData();
+
+            Date endOfStartMonth = addMonths(start, 1);
+
+            if( end.after(endOfStartMonth) )
+                monthData.setDuration(start.getTime(), endOfStartMonth.getTime());
+            else
+                monthData.setDuration(start.getTime(), end.getTime());
+
+            start = endOfStartMonth;
+            monthDataMap.put(month, monthData);
+        }
+
+        report.setMonthData(monthDataMap);
+    }
+
+    public static Date addMonths( Date date, int months )
+    {
+        Calendar cal = Calendar.getInstance();
+        cal.setTime(date);
+        cal.add(Calendar.MONTH, months); //minus number would decrement the days
+        return getBeginningMonth(cal.getTime());
+    }
+
+    public static Date getBeginningMonth( Date date )
+    {
+        Calendar cal = Calendar.getInstance();
+        cal.setTime(date);
+        cal.set(Calendar.HOUR_OF_DAY, 0);
+        cal.set(Calendar.MINUTE, 0);
+        cal.set(Calendar.SECOND, 0);
+        cal.set(Calendar.MILLISECOND, 0);
+        cal.set(Calendar.DAY_OF_MONTH, 1);
+        return cal.getTime();
     }
 
 }
