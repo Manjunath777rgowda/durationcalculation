@@ -26,7 +26,9 @@ public class ReadCSV {
                 if( list.contains("id") )
                     continue;
 
-                Date timestamp = new SimpleDateFormat("yyyy-MM-dd hh:mm:ss").parse(list.get(6));
+                SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS Z");
+                simpleDateFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
+                Date timestamp = simpleDateFormat.parse(list.get(6));
                 AuditLog auditLog = new AuditLog();
                 auditLog.setId(Long.parseLong(list.get(0)));
                 auditLog.setTriggerTime(timestamp);

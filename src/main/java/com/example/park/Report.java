@@ -22,7 +22,8 @@ public class Report {
         {
             this.duration = this.duration + (end - start);
             this.durationCalculation =
-                    this.durationCalculation + String.format("(%s,%s)", new Date(start), new Date(end));
+                    this.durationCalculation + String.format("(%s,%s)", DateUtils.convertISTtoUTC(new Date(start)),
+                            DateUtils.convertISTtoUTC(new Date(end)));
         }
 
         public long getDurationInMin()

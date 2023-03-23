@@ -40,7 +40,7 @@ public class Controller {
                         report.setComments("");
 
                     isStarted = true;
-                    String log = "Park Complete on : " + auditLog.getTriggerTime();
+                    String log = "Park Complete on : " + DateUtils.convertISTtoUTC(auditLog.getTriggerTime());
                     String startLog = report.getComments().isEmpty() ? log : report.getComments() + " | " + log;
                     report.setComments(startLog);
                 }
@@ -50,7 +50,7 @@ public class Controller {
                 {
                     end = auditLog.getTriggerTime();
                     String endLog = report.getComments() + " | " + auditLog.getEventName() + " Complete on : "
-                            + auditLog.getTriggerTime();
+                            + DateUtils.convertISTtoUTC(auditLog.getTriggerTime());
                     report.setComments(endLog);
                     isStarted = false;
                 }
@@ -60,7 +60,7 @@ public class Controller {
                 {
                     end = auditLog.getTriggerTime();
                     String endLog = report.getComments() + " | " + auditLog.getEventName() + " Complete on : "
-                            + auditLog.getTriggerTime();
+                            + DateUtils.convertISTtoUTC(auditLog.getTriggerTime());
                     report.setComments(endLog);
                     isStarted = false;
                 }
@@ -97,12 +97,12 @@ public class Controller {
         HashMap<Integer, Report.MonthData> monthDataMap = report.getMonthData();
         while( start.before(end) )
         {
-            int month = getBeginningMonth(start).getMonth();
+            int month = DateUtils.getBeginningMonth(start).getMonth();
             Report.MonthData monthData = monthDataMap.get(month);
             if( monthData == null )
                 monthData = new Report.MonthData();
 
-            Date endOfStartMonth = addMonths(start, 1);
+            Date endOfStartMonth = DateUtils.addMonths(start, 1);
 
             if( end.after(endOfStartMonth) )
                 monthData.setDuration(start.getTime(), endOfStartMonth.getTime());
@@ -116,24 +116,6 @@ public class Controller {
         report.setMonthData(monthDataMap);
     }
 
-    public static Date addMonths( Date date, int months )
-    {
-        Calendar cal = Calendar.getInstance();
-        cal.setTime(date);
-        cal.add(Calendar.MONTH, months); //minus number would decrement the days
-        return getBeginningMonth(cal.getTime());
-    }
 
-    public static Date getBeginningMonth( Date date )
-    {
-        Calendar cal = Calendar.getInstance();
-        cal.setTime(date);
-        cal.set(Calendar.HOUR_OF_DAY, 0);
-        cal.set(Calendar.MINUTE, 0);
-        cal.set(Calendar.SECOND, 0);
-        cal.set(Calendar.MILLISECOND, 0);
-        cal.set(Calendar.DAY_OF_MONTH, 1);
-        return cal.getTime();
-    }
 
 }
