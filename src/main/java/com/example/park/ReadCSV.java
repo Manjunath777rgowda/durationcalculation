@@ -51,7 +51,7 @@ public class ReadCSV {
         return hashMap;
     }
 
-    public static void writeCSV( List<Report> reportList, List<Integer> months )
+    public static File writeCSV( List<Report> reportList, List<Integer> months )
     {
         try
         {
@@ -95,10 +95,13 @@ public class ReadCSV {
             }
 
             myWriter.close();
+
+            return file;
         }
         catch( Exception e )
         {
             e.printStackTrace();
         }
+        return null;
     }
 }

@@ -8,8 +8,11 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import javax.persistence.*;
 import java.util.Date;
 
+@Table(name = "auditLog")
+@Entity
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
@@ -32,17 +35,44 @@ public class AuditLog implements Comparable<AuditLog> {
     }
 
     private static final long serialVersionUID = 1L;
-    private long id = 0;
+
+    @Id
+    @Column( name = "id" )
+    private long id;
+
+    @Column( name = "level" )
+    @Enumerated( EnumType.STRING )
     private eNOTIFICATION_LEVEL level = eNOTIFICATION_LEVEL.ERROR;
+
+    @Column( name = "priority" )
+    @Enumerated( EnumType.STRING )
     private eNOTIFICATION_PRIORITY priority = eNOTIFICATION_PRIORITY.HIGH;
+
+    @Column( name = "category" )
     private String category;
-    private String userName = "";
+
+    @Column( name = "username" )
+    private String userName;
+
+    @Column( name = "triggertime" )
     private Date triggerTime;
+
+    @Column( name = "source" )
     private String source;
+
+    @Column( name = "details" )
     private String details;
+
+    @Column( name = "resourcetype" )
     private String resourceType;
+
+    @Column( name = "resourceid" )
     private String resourceId;
+
+    @Column( name = "eventname" )
     private String eventName;
+
+    @Column( name = "status" )
     private String status;
 
     @Override

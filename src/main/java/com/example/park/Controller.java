@@ -1,22 +1,47 @@
 package com.example.park;
 
-import org.springframework.web.bind.annotation.GetMapping;
+import io.swagger.annotations.ApiOperation;
+import io.swagger.annotations.ApiParam;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.util.FileCopyUtils;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.BufferedInputStream;
+import java.io.File;
+import java.io.InputStream;
+import java.net.URLConnection;
+import java.nio.file.Files;
+import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.stream.Collectors;
 
 @RestController
-@RequestMapping( "/start" )
+@RequestMapping( "/rest" )
 public class Controller {
 
-    @GetMapping
-    public void generateParkDuration( @RequestParam String monthString ) throws Exception
+    @Autowired
+    private AuditlogReportsitory auditlogReportsitory;
+
+    @ApiOperation( value = "API download park duration", notes = "API download park duration" )
+    @PostMapping( "/download" )
+    public void generateParkDuration( HttpServletRequest request, HttpServletResponse response,
+            @RequestParam @ApiParam( required = true, defaultValue = "2,3" ) String monthString,
+            @RequestParam @ApiParam( required = true, defaultValue = "2023-03-01 00:00:00" ) String startDateString,
+            @RequestParam @ApiParam( required = true, defaultValue = "2023-04-01 00:00:00" ) String endDateString )
+            throws Exception
     {
         List<Integer> months = validateMonthString(monthString);
-        HashMap<String, List<AuditLog>> hashmap = ReadCSV.readCSV();
+        SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+        simpleDateFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
+        Date startDate = simpleDateFormat.parse(startDateString);
+        Date endDate = simpleDateFormat.parse(endDateString);
+
+        HashMap<String, List<AuditLog>> hashmap = getAuditLogFromDb(startDate, endDate);
         List<Report> result = new ArrayList<>();
 
         for( Map.Entry<String, List<AuditLog>> entry : hashmap.entrySet() )
@@ -78,8 +103,51 @@ public class Controller {
             result.add(report);
         }
 
-        ReadCSV.writeCSV(result, months);
-        System.out.println("Completed");
+        File file = ReadCSV.writeCSV(result, months);
+
+        if( file.exists() )
+        {
+
+            //get the mimetype
+            String mimeType = URLConnection.guessContentTypeFromName(file.getName());
+            if( mimeType == null )
+            {
+                //unknown mimetype so set the mimetype to application/octet-stream
+                mimeType = "application/octet-stream";
+            }
+
+            response.setContentType(mimeType);
+            response.setHeader("Content-Disposition", String.format("inline; filename=\"" + file.getName() + "\""));
+
+            //Here we have mentioned it to show as attachment
+            //response.setHeader("Content-Disposition", String.format("attachment; filename=\"" + file.getName() +
+            // "\""));
+
+            response.setContentLength((int) file.length());
+
+            InputStream inputStream = new BufferedInputStream(Files.newInputStream(file.toPath()));
+
+            FileCopyUtils.copy(inputStream, response.getOutputStream());
+
+        }
+
+        System.out.println("Complete");
+    }
+
+    private HashMap<String, List<AuditLog>> getAuditLogFromDb( Date startDate, Date endDate )
+    {
+        List<String> resourceIds = auditlogReportsitory.getAllResource(startDate, endDate);
+
+        List<AuditLog> all = auditlogReportsitory.findAll();
+        Set<String> collect = all.stream().map(AuditLog::getResourceId).collect(Collectors.toSet());
+        HashMap<String, List<AuditLog>> hashMap = new HashMap<>();
+        for( String id : collect )
+        {
+            List<AuditLog> auditLogs = auditlogReportsitory.getAuditLogs(startDate, endDate, id);
+            if( !auditLogs.isEmpty() )
+                hashMap.put(id, auditLogs);
+        }
+        return hashMap;
     }
 
     private List<Integer> validateMonthString( String monthString ) throws Exception
