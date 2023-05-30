@@ -31,6 +31,7 @@ public class Controller {
     @PostMapping( "/download" )
     public void generateParkDuration( HttpServletRequest request, HttpServletResponse response,
             @RequestParam @ApiParam( required = true, defaultValue = "2,3" ) String monthString,
+            @RequestParam @ApiParam( required = true, defaultValue = "1" ) Integer tenantId,
             @RequestParam @ApiParam( required = true, defaultValue = "2023-03-01 00:00:00" ) String startDateString,
             @RequestParam @ApiParam( required = true, defaultValue = "2023-04-01 00:00:00" ) String endDateString )
             throws Exception
@@ -41,7 +42,7 @@ public class Controller {
         Date startDate = simpleDateFormat.parse(startDateString);
         Date endDate = simpleDateFormat.parse(endDateString);
 
-        HashMap<String, List<AuditLog>> hashmap = getAuditLogFromDb(startDate, endDate);
+        HashMap<String, List<AuditLog>> hashmap = getAuditLogFromDb(startDate, endDate, tenantId);
         List<Report> result = new ArrayList<>();
 
         for( Map.Entry<String, List<AuditLog>> entry : hashmap.entrySet() )
@@ -98,7 +99,7 @@ public class Controller {
                 }
 
                 if( start != null && i == valueSize - 1 )
-                    calculateTheDuration(start, new Date(), report);
+                    calculateTheDuration(start, endDate, report);
             }
             result.add(report);
         }
@@ -134,14 +135,11 @@ public class Controller {
         System.out.println("Complete");
     }
 
-    private HashMap<String, List<AuditLog>> getAuditLogFromDb( Date startDate, Date endDate )
+    private HashMap<String, List<AuditLog>> getAuditLogFromDb( Date startDate, Date endDate, Integer tenantId )
     {
-        List<String> resourceIds = auditlogReportsitory.getAllResource(startDate, endDate);
-
-        List<AuditLog> all = auditlogReportsitory.findAll();
-        Set<String> collect = all.stream().map(AuditLog::getResourceId).collect(Collectors.toSet());
+        List<String> resourceIds = auditlogReportsitory.getAllResource(tenantId, startDate, endDate);
         HashMap<String, List<AuditLog>> hashMap = new HashMap<>();
-        for( String id : collect )
+        for( String id : resourceIds )
         {
             List<AuditLog> auditLogs = auditlogReportsitory.getAuditLogs(startDate, endDate, id);
             if( !auditLogs.isEmpty() )
@@ -166,11 +164,19 @@ public class Controller {
         while( start.before(end) )
         {
             int month = DateUtils.getBeginningMonth(start).getMonth();
+            int year = start.getYear() + 1900;
+            Date endOfStartMonth = DateUtils.addMonths(start, 1);
+
+            if( year != 2023 )
+            {
+                start = endOfStartMonth;
+                continue;
+            }
+
             Report.MonthData monthData = monthDataMap.get(month);
             if( monthData == null )
                 monthData = new Report.MonthData();
 
-            Date endOfStartMonth = DateUtils.addMonths(start, 1);
 
             if( end.after(endOfStartMonth) )
                 monthData.setDuration(start.getTime(), endOfStartMonth.getTime());
