@@ -13,11 +13,10 @@ import java.util.*;
 
 public class ReadCSV {
 
-    public static HashMap<String, List<AuditLog>> readCSV() throws IOException, ParseException
+    public static HashMap<String, List<AuditLog>> readCSV(File file) throws IOException, ParseException
     {
-        String fileName = "C:\\Users\\Admin\\Downloads\\Auditlog_dataset.csv";
         HashMap<String, List<AuditLog>> hashMap = new HashMap<>();
-        try( CSVReader csvReader = new CSVReader(new FileReader(fileName)); )
+        try( CSVReader csvReader = new CSVReader(new FileReader(file)); )
         {
             String[] values = null;
             while( (values = csvReader.readNext()) != null )

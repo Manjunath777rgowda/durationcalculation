@@ -2,12 +2,12 @@ package com.example.park;
 
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.util.FileCopyUtils;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -24,25 +24,17 @@ import java.util.stream.Collectors;
 @RequestMapping( "/rest" )
 public class Controller {
 
-    @Autowired
-    private AuditlogReportsitory auditlogReportsitory;
-
     @ApiOperation( value = "API download park duration", notes = "API download park duration" )
     @PostMapping( "/download" )
     public void generateParkDuration( HttpServletRequest request, HttpServletResponse response,
             @RequestParam @ApiParam( required = true, defaultValue = "2,3" ) String monthString,
-            @RequestParam @ApiParam( required = true, defaultValue = "1" ) Integer tenantId,
-            @RequestParam @ApiParam( required = true, defaultValue = "2023-03-01 00:00:00" ) String startDateString,
-            @RequestParam @ApiParam( required = true, defaultValue = "2023-04-01 00:00:00" ) String endDateString )
+            @RequestParam MultipartFile file )
             throws Exception
     {
         List<Integer> months = validateMonthString(monthString);
-        SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-        simpleDateFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
-        Date startDate = simpleDateFormat.parse(startDateString);
-        Date endDate = simpleDateFormat.parse(endDateString);
+        File uploadFile = FileUtil.uploadFile(file);
 
-        HashMap<String, List<AuditLog>> hashmap = getAuditLogFromDb(startDate, endDate, tenantId);
+        HashMap<String, List<AuditLog>> hashmap = ReadCSV.readCSV(uploadFile);
         List<Report> result = new ArrayList<>();
 
         for( Map.Entry<String, List<AuditLog>> entry : hashmap.entrySet() )
@@ -99,18 +91,18 @@ public class Controller {
                 }
 
                 if( start != null && i == valueSize - 1 )
-                    calculateTheDuration(start, endDate, report);
+                    calculateTheDuration(start, new Date(), report);
             }
             result.add(report);
         }
 
-        File file = ReadCSV.writeCSV(result, months);
+        File resultFile = ReadCSV.writeCSV(result, months);
 
-        if( file.exists() )
+        if( resultFile.exists() )
         {
 
             //get the mimetype
-            String mimeType = URLConnection.guessContentTypeFromName(file.getName());
+            String mimeType = URLConnection.guessContentTypeFromName(resultFile.getName());
             if( mimeType == null )
             {
                 //unknown mimetype so set the mimetype to application/octet-stream
@@ -118,15 +110,15 @@ public class Controller {
             }
 
             response.setContentType(mimeType);
-            response.setHeader("Content-Disposition", String.format("inline; filename=\"" + file.getName() + "\""));
+            response.setHeader("Content-Disposition", String.format("inline; filename=\"" + resultFile.getName() + "\""));
 
             //Here we have mentioned it to show as attachment
-            //response.setHeader("Content-Disposition", String.format("attachment; filename=\"" + file.getName() +
+            //response.setHeader("Content-Disposition", String.format("attachment; filename=\"" + resultFile.getName() +
             // "\""));
 
-            response.setContentLength((int) file.length());
+            response.setContentLength((int) resultFile.length());
 
-            InputStream inputStream = new BufferedInputStream(Files.newInputStream(file.toPath()));
+            InputStream inputStream = new BufferedInputStream(Files.newInputStream(resultFile.toPath()));
 
             FileCopyUtils.copy(inputStream, response.getOutputStream());
 
@@ -135,18 +127,18 @@ public class Controller {
         System.out.println("Complete");
     }
 
-    private HashMap<String, List<AuditLog>> getAuditLogFromDb( Date startDate, Date endDate, Integer tenantId )
-    {
-        List<String> resourceIds = auditlogReportsitory.getAllResource(tenantId, startDate, endDate);
-        HashMap<String, List<AuditLog>> hashMap = new HashMap<>();
-        for( String id : resourceIds )
-        {
-            List<AuditLog> auditLogs = auditlogReportsitory.getAuditLogs(startDate, endDate, id);
-            if( !auditLogs.isEmpty() )
-                hashMap.put(id, auditLogs);
-        }
-        return hashMap;
-    }
+//    private HashMap<String, List<AuditLog>> getAuditLogFromDb( Date startDate, Date endDate, Integer tenantId )
+//    {
+//        List<String> resourceIds = auditlogReportsitory.getAllResource(tenantId, startDate, endDate);
+//        HashMap<String, List<AuditLog>> hashMap = new HashMap<>();
+//        for( String id : resourceIds )
+//        {
+//            List<AuditLog> auditLogs = auditlogReportsitory.getAuditLogs(startDate, endDate, id);
+//            if( !auditLogs.isEmpty() )
+//                hashMap.put(id, auditLogs);
+//        }
+//        return hashMap;
+//    }
 
     private List<Integer> validateMonthString( String monthString ) throws Exception
     {
