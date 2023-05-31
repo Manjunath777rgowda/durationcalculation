@@ -3,10 +3,7 @@ package com.example.park;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import org.springframework.util.FileCopyUtils;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.servlet.http.HttpServletRequest;
@@ -125,6 +122,30 @@ public class Controller {
         }
 
         System.out.println("Complete");
+    }
+
+    @GetMapping("/query")
+    public String getQuery( @RequestParam String resourceGuids,
+            @RequestParam @ApiParam( required = true, defaultValue = "2023-03-01 00:00:00" ) String startDateString,
+            @RequestParam @ApiParam( required = true, defaultValue = "2023-04-01 00:00:00" ) String endDateString)
+    {
+        String query = "( select * from AuditLog where triggerTime < ':startDate' and category = 'RESOURCE_MANAGER' "
+                + "and resourceType = 'Deployment' and resourceId in (:resourceId) " + "and ((eventName in ('Stop',"
+                + "'Park') "
+                + "and status = 'Failed') or (eventName in ('Create','Redeploy','Stop','Start','Delete','Park','Unpark') "
+                + "and status = 'Complete')) order by triggerTime desc limit 1) " + "union all "
+                + "(select * from AuditLog where triggerTime >= ':startDate' and triggerTime < ':endDate' "
+                + "and category = 'RESOURCE_MANAGER' and resourceType = 'Deployment' and resourceId in (:resourceId) "
+                + "and ((eventName in ('Stop','Park')and status = 'Failed') "
+                + "or (eventName in ('Create','Redeploy','Stop','Start','Delete','Park','Unpark') and status = "
+                + "'Complete')) "
+                + "order by triggerTime)";
+        query = query.replace(":startDate",startDateString);
+        query = query.replace(":endDate",endDateString);
+        String[] split = resourceGuids.split(",");
+        String collect = Arrays.stream(split).map(s -> "'" + s + "'").collect(Collectors.joining(","));
+        query = query.replace(":resourceId",collect);
+        return query;
     }
 
 //    private HashMap<String, List<AuditLog>> getAuditLogFromDb( Date startDate, Date endDate, Integer tenantId )
